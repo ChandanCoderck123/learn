@@ -73,13 +73,18 @@ except Exception as e:
 app = Flask(__name__)
 
 @app.route('/rfq', methods=['POST'])
+@app.route('/rfq', methods=['POST'])
 def rfq_search():
     data = request.get_json()
     if not data or 'rfq' not in data:
         return jsonify({"error": "Invalid request. Provide 'rfq' field in JSON."}), 400
 
     rfq_input = data['rfq']
-    rfq_lines = rfq_input.strip().split("\n")
+    
+    # Normalize the input by replacing commas with newlines and stripping extra spaces
+    rfq_input = re.sub(r'\s*,\s*', '\n', rfq_input)  # Replace commas with newline
+    rfq_lines = rfq_input.strip().split("\n")  # Split by newline characters
+
     matched_products = []
 
     for line in rfq_lines:
