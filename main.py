@@ -32,6 +32,10 @@ def get_embedding(text):
 def clean_text(text):
     return re.sub(r'[^\x00-\x7F]+', '', text).strip()
 
+def split_rfq_input(rfq_input):
+    """Splits RFQ input based on newline, comma, or comma with space."""
+    return re.split(r'\n|,\s*', rfq_input.strip())
+
 # Load CSV file
 csv_path = "SKU_list_of_23-24.csv"
 
@@ -79,13 +83,7 @@ def rfq_search():
         return jsonify({"error": "Invalid request. Provide 'rfq' field in JSON."}), 400
 
     rfq_input = data['rfq']
-    
-    # Normalize the input by replacing commas (with or without spaces) with newlines
-    rfq_input = re.sub(r'\s*,\s*', '\n', rfq_input.strip())
-    
-    # Now split by newline
-    rfq_lines = rfq_input.split("\n")
-    
+    rfq_lines = split_rfq_input(rfq_input)
     matched_products = []
 
     for line in rfq_lines:
