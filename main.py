@@ -73,7 +73,6 @@ except Exception as e:
 app = Flask(__name__)
 
 @app.route('/rfq', methods=['POST'])
-@app.route('/rfq', methods=['POST'])
 def rfq_search():
     data = request.get_json()
     if not data or 'rfq' not in data:
