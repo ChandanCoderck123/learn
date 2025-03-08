@@ -81,10 +81,12 @@ def rfq_search():
 
     rfq_input = data['rfq']
     
-    # Normalize the input by replacing commas with newlines and stripping extra spaces
-    rfq_input = re.sub(r'\s*,\s*', '\n', rfq_input)  # Replace commas with newline
-    rfq_lines = rfq_input.strip().split("\n")  # Split by newline characters
-
+    # Normalize the input by replacing commas (with or without spaces) with newlines
+    rfq_input = re.sub(r'\s*,\s*', '\n', rfq_input.strip())
+    
+    # Now split by newline
+    rfq_lines = rfq_input.split("\n")
+    
     matched_products = []
 
     for line in rfq_lines:
