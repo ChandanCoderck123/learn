@@ -1,12 +1,18 @@
+from flask import Flask, request, jsonify
 import openai
 import faiss
 import numpy as np
 import pandas as pd
 import re
-import json
-from flask import Flask, request, jsonify
 import os
 from dotenv import load_dotenv
+from pydantic import BaseModel
+
+# Pydantic model
+class RfqList(BaseModel):
+    item: str
+    brand: str
+    qty: int
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,22 +36,15 @@ def get_embedding(text):
         return None
 
 def clean_text(text):
-    return re.sub(r'[^\x00-\x7F]+', '', text).strip()
-
-def split_rfq_input(rfq_input):
-    """Splits RFQ input based on newline, comma, or comma with space."""
-    return re.split(r'\n|,\s*', rfq_input.strip())
+    return re.sub(r'[^\x00-\x7F]+', ' ', text).strip()
 
 # Load CSV file
 csv_path = "SKU_list_of_23-24.csv"
 
 try:
     catalog_df = pd.read_csv(csv_path)
-    catalog_df = catalog_df[['SKU', 'Brand', 'Description', 'Qty 2023-24']].fillna("")
-    
-    # Convert "Qty 2023-24" to integer format
-    catalog_df['Qty 2023-24'] = catalog_df['Qty 2023-24'].astype(str).str.replace(',', '').astype(float).fillna(1).astype(int)
-    
+    catalog_df = catalog_df[['SKU', 'Brand', 'Description']].fillna("")
+
     product_texts = catalog_df.apply(
         lambda x: f"{x['Brand']} {x['Description']}", axis=1
     )
@@ -83,12 +82,22 @@ def rfq_search():
         return jsonify({"error": "Invalid request. Provide 'rfq' field in JSON."}), 400
 
     rfq_input = data['rfq']
-    rfq_lines = split_rfq_input(rfq_input)
+    rfq_lines = re.split(r'[,\n]\s*', clean_text(rfq_input))
     matched_products = []
 
     for line in rfq_lines:
-        query = clean_text(line)
-        query_embedding = get_embedding(query)
+        # Default quantity is 1 if not specified
+        quantity = 1
+        item_description = line.strip()
+        # Try to extract quantity if present at the end
+        match = re.search(r'(\d+)\s*(annually|monthly)?$', item_description)
+        if match:
+            quantity = int(match.group(1))
+            if match.group(2) == 'annually':
+                quantity = quantity // 12  # Convert to monthly if annually
+            item_description = item_description[:match.start()].strip()
+
+        query_embedding = get_embedding(item_description)
         if query_embedding is None:
             continue
         _, indices = faiss_index.search(query_embedding.reshape(1, -1), 5)
@@ -99,14 +108,9 @@ def rfq_search():
             if match_idx < 0:
                 continue
             matched_row = catalog_map[match_idx]
-            
-            # Get quantity from "Qty 2023-24" column
-            quantity = matched_row.get("Qty 2023-24", 1)
-            
             match_entry = {
                 "rank": rank + 1,
                 "product_id": matched_row["SKU"],
-                "brand": matched_row["Brand"],
                 "product_name": matched_row["Description"],
                 "quantity": quantity
             }
